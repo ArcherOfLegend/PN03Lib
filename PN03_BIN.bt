@@ -1,0 +1,96 @@
+//------------------------------------------------
+// 010 Editor Template: P.N.03 (GameCube) BIN model
+// Big endian.
+//------------------------------------------------
+BigEndian();
+
+typedef struct {
+    uint32 boneOff;
+    uint32 unk04;
+    uint32 unk08;
+    uint32 colourOff;
+    uint32 uvOff;
+    uint32 weightOff;
+    ubyte  weightCount;
+    ubyte  boneCount;
+    ubyte  unk1A;
+    ubyte  groupCount;
+    uint32 groupOff;
+    uint32 attrFlags <format=hex, comment="bit31: display lists carry a colour index (8-byte verts, else 6)">;
+    uint32 textureCount;
+    ubyte  posShift <comment="position = s16 / 2^posShift">;
+    ubyte  unk29[3];
+    uint32 unk2C;
+    uint32 posOff;
+    uint32 normalOff;
+    uint16 posCount;
+    uint16 normalCount;
+    uint32 unk3C <format=hex>;
+} HEADER;
+
+typedef struct {
+    ubyte id;
+    ubyte parentId <comment="0xFF = root">;
+    ubyte pad[2];
+    float x, y, z <comment="offset from parent, bind pose has no rotation">;
+} BONE <read=Str("id %d parent %d", id, parentId)>;
+
+typedef struct {
+    int16  x, y, z;
+    uint16 weightIndex;
+} POSITION;
+
+typedef struct {
+    int16 x, y, z <comment="/ 16384">;
+    int16 pad;
+} NORMAL;
+
+typedef struct {
+    uint16 u, v <comment="/ 256">;
+} UV;
+
+typedef struct {
+    ubyte bone[3] <comment="bone ids">;
+    ubyte count;
+    ubyte weight[3] <comment="percent, sums to 100">;
+    ubyte pad;
+} WEIGHT;
+
+typedef struct (int hasColour) {
+    uint16 pos;
+    uint16 normal;
+    if (hasColour) uint16 colour;
+    uint16 uv;
+} DLVERT;
+
+typedef struct (int hasColour) {
+    ubyte  op <format=hex, comment="0x80 quads, 0x90 tris, 0x98 strip, 0xA0 fan">;
+    uint16 count;
+    DLVERT v(hasColour)[count] <optimize=false>;
+} PRIM;
+
+typedef struct (int hasColour) {
+    ubyte  unk00[11];
+    ubyte  kind <comment="0 plain, 1/3 + secondary IA8 map, 2 tinted, 5 hair (tex[2] = alpha mask)">;
+    ubyte  tex[4] <comment="TPL indices, 0xFF none">;
+    ubyte  colour[4];
+    ubyte  unk14[4];
+    uint32 dlSize;
+    uint32 triCount;
+    local int64 dlEnd = FTell() + dlSize;
+    while (FTell() + 3 <= dlEnd && ReadUByte(FTell()) != 0)
+        PRIM prim(hasColour);
+    FSeek(dlEnd);
+} GROUP;
+
+HEADER hdr;
+local int hasColour = (hdr.attrFlags >> 31) & 1;
+FSeek(hdr.boneOff);   BONE     bones[hdr.boneCount];
+FSeek(hdr.posOff);    POSITION positions[hdr.posCount];
+FSeek(hdr.normalOff); NORMAL   normals[hdr.normalCount];
+FSeek(hdr.uvOff);     UV       uvs[(hdr.weightOff - hdr.uvOff) / 4];
+FSeek(hdr.weightOff); WEIGHT   weights[hdr.weightCount];
+FSeek(hdr.groupOff);
+local int g;
+for (g = 0; g < hdr.groupCount && FTell() + 0x20 <= FileSize(); g++)
+    GROUP group(hasColour);

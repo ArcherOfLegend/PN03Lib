@@ -1,0 +1,53 @@
+//------------------------------------------------
+// 010 Editor Template: P.N.03 (GameCube) FCV animation
+// Big endian. Utilizes hermite function curves, one track = 3 axis curves.
+// Reversed from MotionMoveCore, HermiteInterpolation, Fcc_get_data_0XY,
+// Fcc_next_axis_addr, IKInit / InverseKinematics / ikCalc / heel_toe.
+//
+// desc u16:
+//   bits 12-15 key type = 4*valueFmt + tangentFmt  (fmt 0 = f32, 1 = s16, 2 = s8; ints * 0.0001)
+//   bits  8-11 IK pole axis (0 +Y, 1 -Y, 2 +X, 3 -X, 4 +Z, 5 -Z)
+//   bits  0-7  0x01 root motion (character offset), 0x02 rotation (rad, Rz*Ry*Rx),
+//              0x04 translation, 0x08 scale, 0x10 IK thigh, 0x20 IK thigh + heel/toe.
+// For an IK leg (thigh = bone N), the translation track on bone N+2 is the goal in
+// character space (the toe target when 0x20 is set); bone N+1 (knee) is solved.
+//------------------------------------------------
+BigEndian();
+
+local int keySize[12] = {12, 8, 6, 0, 10, 6, 4, 0, 9, 5, 3, 0};
+
+typedef struct (int type) {
+    local int vf = type >> 2, tf = type & 3;
+    if (vf == 0) float v; else if (vf == 1) int16 v; else byte v;
+    if (tf == 0) { float tIn; float tOut; }
+    else if (tf == 1) { int16 tIn; int16 tOut; }
+    else { byte tIn; byte tOut; }
+} KEY;
+
+typedef struct (int type) {
+    uint16 keyCount;
+    uint16 frame[keyCount];
+    KEY    key(type)[keyCount] <optimize=false>;
+} AXIS;
+
+typedef struct (int type) {
+    AXIS x(type);
+    AXIS y(type);
+    AXIS z(type);
+} TRACK;
+
+uint16 frameCount;
+ubyte  trackCount;
+uint16 desc[trackCount] <format=hex>;
+ubyte  bone[trackCount];
+FSeek((FTell() + 3) & ~3);
+uint32 extraOff <format=hex>;
+uint32 trackOff[trackCount] <format=hex>;
+
+local int i;
+for (i = 0; i < trackCount; i++) {
+    if (trackOff[i] != 0 && keySize[desc[i] >> 12] != 0) {
+        FSeek(trackOff[i]);
+        TRACK track(desc[i] >> 12);
+    }
+}
