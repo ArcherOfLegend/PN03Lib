@@ -12,7 +12,7 @@ This repo does not contain game files. Piracy is illegal!
 | --- | --- |
 | [`docs/formats.md`](docs/formats.md) | Byte-level specs for `.dat` archives, BIN models, TPL textures, FCV animations, the LZS compression, room files and cutscene events, and the `MEKA.sym` symbol map |
 | [`docs/animation.md`](docs/animation.md) | Information about the animation files.|
-| [`main`](main) | The Blender add-on (`io_import_pn03.zip`) and its source |
+| [`main`](https://github.com/ArcherOfLegend/PN03Lib) | The Blender add-on (`io_import_pn03.zip`) and its source |
 
 ## The Blender add-on
 
